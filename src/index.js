@@ -8,18 +8,18 @@ function wait(ms) {
 }
 
 const bgSound = new Howl({
-  src: ['/assets/bgsound.mp3'],
+  src: ['assets/bgsound.mp3'],
   loop: true,
 });
 
 bgSound.play();
 
 const stepSound = new Howl({
-  src: ['/assets/step.mp3'],
+  src: ['assets/step.mp3'],
 });
 
 const spotSound = new Howl({
-  src: ['/assets/success.mp3'],
+  src: ['assets/success.mp3'],
 });
 
 const currentLevel = document.getElementById('currentlevel');

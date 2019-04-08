@@ -34,7 +34,7 @@ body {
   overflow: hidden;
   width: 480px;
   height: 320px;
-  background-image: url(/assets/grass.png);
+  background-image: url(../assets/grass.png);
 }
 
 #boxmap > i {
@@ -42,7 +42,7 @@ body {
   position: absolute;
   width: 32px;
   height: 32px;
-  background-image: url(/assets/sprites.png);
+  background-image: url(../assets/sprites.png);
   background-repeat: no-repeat;
 }
 

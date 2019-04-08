@@ -1,0 +1,43 @@
+{
+  "name": "2019-contest",
+  "version": "1.0.0",
+  "description": "这是星计划校招选拔的综合挑战题",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack-dev-server --watch-poll",
+    "build": "webpack --env.production",
+    "lint": "eslint src --fix",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/75camp/2019-contest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/75camp/2019-contest/issues"
+  },
+  "homepage": "https://github.com/75camp/2019-contest#readme",
+  "devDependencies": {
+    "@babel/cli": "^7.2.3",
+    "@babel/core": "^7.4.0",
+    "@babel/plugin-proposal-class-properties": "^7.4.0",
+    "@babel/plugin-transform-runtime": "^7.4.0",
+    "@babel/preset-env": "^7.4.2",
+    "babel-eslint": "^10.0.1",
+    "babel-loader": "^8.0.5",
+    "eslint": "^5.15.3",
+    "eslint-config-sprite": "^1.0.6",
+    "eslint-plugin-html": "^5.0.3",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.3.0",
+    "webpack-dev-server": "^3.2.1"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.4.2",
+    "greenlet": "^1.0.1",
+    "howler": "^2.1.1"
+  }
+}

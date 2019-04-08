@@ -1,0 +1,108 @@
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  display: flex;
+}
+
+#info {
+  position: absolute;
+  padding: 20px;
+}
+
+.gamepanel {
+  margin: auto;
+}
+
+.levelpanel {
+  text-align: right;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+
+#currentlevel {
+  width: 26px;
+  text-align: center;
+}
+
+#boxmap {
+  position: relative;
+  overflow: hidden;
+  width: 480px;
+  height: 320px;
+  background-image: url(/assets/grass.png);
+}
+
+#boxmap > i {
+  display: inline-block;
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background-image: url(/assets/sprites.png);
+  background-repeat: no-repeat;
+}
+
+#game-result {
+  position: absolute;
+  left: 50%;
+  top: 88%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  z-index: 999;
+  font-size: 4rem;
+  font-weight: bold;
+  opacity: 0;
+  transition: all .3s;
+}
+
+#game-result.show {
+  top: 38%;
+  opacity: 1;
+  transition: all .6s ease-out;
+}
+
+@keyframes walk {
+  0% {background-position-y: -96px}
+  33% {background-position-y: -32px}
+  66% {background-position-y: -64px}
+  100% {background-position-y: -96px}
+}
+
+.tree {
+  background-position: -96px 0;
+}
+
+.spot {
+  background-position: 0 0;
+}
+
+.bucket {
+  background-position: -32px 0;
+  z-index: 1;
+}
+
+.boxman {
+  background-position-y: -96px;
+  z-index: 2;
+}
+
+.up {
+  background-position-x: 0px;
+}
+.right {
+  background-position-x: -32px;
+}
+.down {
+  background-position-x: -64px;
+}
+.left {
+  background-position-x: -96px;
+}
+
+.walk {
+  animation: walk step-end .2s forwards;
+}

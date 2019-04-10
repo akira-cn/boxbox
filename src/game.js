@@ -192,7 +192,14 @@ export default class BoxGame {
   }
 
   async solve(level = this.level) {
+    const key = `solved${level}`;
+    const steps = localStorage.getItem(key);
+    if(steps) {
+      return steps.split(',');
+    }
+
     const result = await solver(getData(level));
+    localStorage.setItem(key, result.join());
     return result;
   }
 

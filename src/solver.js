@@ -13,15 +13,15 @@ export default greenlet((data) => {
     map[t[1] * BOUND_X + t[0]] = TREE;
   });
 
-  const buckets = new Set(data.buckets.map(b => b[1] * BOUND_X + b[0]));
+  const allBuckets = new Set(data.buckets.map(b => b[1] * BOUND_X + b[0]));
   const spots = data.spots.map(s => s[1] * BOUND_X + s[0]);
 
-  function record(x, y) {
+  function record(buckets, x, y) {
     const key = JSON.stringify({x, y, b: Array.from(buckets).sort()});
     return key;
   }
 
-  function isEmpty(idx) {
+  function isEmpty(buckets, idx) {
     return map[idx] === EMPTY && !buckets.has(idx);
   }
 
@@ -29,7 +29,7 @@ export default greenlet((data) => {
     return spots.some(spot => spot === idx);
   }
 
-  function deadBucket(bucket) {
+  function deadBucket(buckets, bucket) {
     const fixed = new Set();
 
     function isImmovable(idx) {
@@ -64,154 +64,152 @@ export default greenlet((data) => {
     return true;
   }
 
-  function testMove(nextnext, next) {
+  const MOVE_MAN = 1,
+    MOVE_BOX = 2;
+
+  function testMove(buckets, nextnext, next) {
     buckets.delete(next);
     buckets.add(nextnext);
-    if(deadBucket(nextnext)) {
+    if(deadBucket(buckets, nextnext)) {
       buckets.delete(nextnext);
       buckets.add(next);
-      return false;
+      return 0;
     }
-    return [next, nextnext];
+    return MOVE_BOX;
   }
 
-  function moveLeft(x, y) {
-    if(x < 1) return false;
+  function moveLeft(buckets, x, y) {
+    if(x < 1) return 0;
     const next = y * BOUND_X + x - 1;
-    if(isEmpty(next)) {
-      return true;
+    if(isEmpty(buckets, next)) {
+      return MOVE_MAN;
     }
     if(buckets.has(next)) {
-      if(x < 2) return false;
+      if(x < 2) return 0;
       const nextnext = next - 1;
-      if(isEmpty(nextnext)) {
-        return testMove(nextnext, next);
+      if(isEmpty(buckets, nextnext)) {
+        return testMove(buckets, nextnext, next);
       }
     }
-    return false;
+    return 0;
   }
 
-  function moveUp(x, y) {
-    if(y < 1) return false;
+  function moveUp(buckets, x, y) {
+    if(y < 1) return 0;
     const next = (y - 1) * BOUND_X + x;
-    if(isEmpty(next)) {
-      return true;
+    if(isEmpty(buckets, next)) {
+      return MOVE_MAN;
     }
     if(buckets.has(next)) {
-      if(y < 2) return false;
+      if(y < 2) return 0;
       const nextnext = next - BOUND_X;
-      if(isEmpty(nextnext)) {
-        return testMove(nextnext, next);
+      if(isEmpty(buckets, nextnext)) {
+        return testMove(buckets, nextnext, next);
       }
     }
-    return false;
+    return 0;
   }
 
-  function moveRight(x, y) {
-    if(x >= BOUND_X - 1) return false;
+  function moveRight(buckets, x, y) {
+    if(x >= BOUND_X - 1) return 0;
     const next = y * BOUND_X + x + 1;
-    if(isEmpty(next)) {
-      return true;
+    if(isEmpty(buckets, next)) {
+      return MOVE_MAN;
     }
     if(buckets.has(next)) {
-      if(x >= BOUND_X - 2) return false;
+      if(x >= BOUND_X - 2) return 0;
       const nextnext = next + 1;
-      if(isEmpty(nextnext)) {
-        return testMove(nextnext, next);
+      if(isEmpty(buckets, nextnext)) {
+        return testMove(buckets, nextnext, next);
       }
     }
-    return false;
+    return 0;
   }
 
-  function moveDown(x, y) {
-    if(y >= BOUND_Y - 1) return false;
+  function moveDown(buckets, x, y) {
+    if(y >= BOUND_Y - 1) return 0;
     const next = (y + 1) * BOUND_X + x;
-    if(isEmpty(next)) {
-      return true;
+    if(isEmpty(buckets, next)) {
+      return MOVE_MAN;
     }
     if(buckets.has(next)) {
-      if(y >= BOUND_Y - 2) return false;
+      if(y >= BOUND_Y - 2) return 0;
       const nextnext = next + BOUND_X;
-      if(isEmpty(nextnext)) {
-        return testMove(nextnext, next);
+      if(isEmpty(buckets, nextnext)) {
+        return testMove(buckets, nextnext, next);
       }
     }
-    return false;
+    return 0;
   }
 
-  function checkSpots() {
+  function checkSpots(buckets) {
     return spots.every((s) => {
       return buckets.has(s);
     });
   }
 
-  const steps = [];
-
-  const recordSet = new Map();
-
+  const recordSet = new Set();
   let results = null;
+  const x = Number(data.man[0]),
+    y = Number(data.man[1]);
 
-  function step(x, y) {
-    if(results && steps.length >= results.length) return;
+  const list = [{buckets: allBuckets, steps: [], x, y}];
 
-    const mapRecord = record(x, y);
-    if(recordSet.has(mapRecord)) {
-      const len = recordSet.get(mapRecord);
-      if(len <= steps.length) {
-        return;
-      }
-    }
-    recordSet.set(mapRecord, steps.length);
-
-    if(checkSpots()) {
-      if(!results || results.length > steps.length) {
-        results = steps.slice(0);
-      }
-    }
-    let check;
-    check = moveLeft(x, y);
+  for(let i = 0; i < list.length; i++) {
+    const {buckets, steps, x, y} = list[i];
+    let mvb = new Set(buckets);
+    let check = moveLeft(mvb, x, y);
     if(check) {
-      steps.push('left');
-      step(x - 1, y);
-      if(check.length) {
-        buckets.add(check[0]);
-        buckets.delete(check[1]);
+      const mapRecord = record(mvb, x - 1, y);
+      if(check === MOVE_BOX && checkSpots(mvb)) {
+        results = steps.concat('left');
+        break;
       }
-      steps.pop();
+      if(!recordSet.has(mapRecord)) {
+        list.push({buckets: mvb, steps: steps.concat('left'), x: x - 1, y});
+        recordSet.add(mapRecord);
+      }
     }
-    check = moveRight(x, y);
+    mvb = new Set(buckets);
+    check = moveRight(mvb, x, y);
     if(check) {
-      steps.push('right');
-      step(x + 1, y);
-      if(check.length) {
-        buckets.add(check[0]);
-        buckets.delete(check[1]);
+      const mapRecord = record(mvb, x + 1, y);
+      if(check === MOVE_BOX && checkSpots(mvb)) {
+        results = steps.concat('right');
+        break;
       }
-      steps.pop();
+      if(!recordSet.has(mapRecord)) {
+        list.push({buckets: mvb, steps: steps.concat('right'), x: x + 1, y});
+        recordSet.add(mapRecord);
+      }
     }
-    check = moveUp(x, y);
+    mvb = new Set(buckets);
+    check = moveUp(mvb, x, y);
     if(check) {
-      steps.push('up');
-      step(x, y - 1);
-      if(check.length) {
-        buckets.add(check[0]);
-        buckets.delete(check[1]);
+      const mapRecord = record(mvb, x, y - 1);
+      if(check === MOVE_BOX && checkSpots(mvb)) {
+        results = steps.concat('up');
+        break;
       }
-      steps.pop();
+      if(!recordSet.has(mapRecord)) {
+        list.push({buckets: mvb, steps: steps.concat('up'), x, y: y - 1});
+        recordSet.add(mapRecord);
+      }
     }
-    check = moveDown(x, y);
+    mvb = new Set(buckets);
+    check = moveDown(mvb, x, y);
     if(check) {
-      steps.push('down');
-      step(x, y + 1);
-      if(check.length) {
-        buckets.add(check[0]);
-        buckets.delete(check[1]);
+      const mapRecord = record(mvb, x, y + 1);
+      if(check === MOVE_BOX && checkSpots(mvb)) {
+        results = steps.concat('down');
+        break;
       }
-      steps.pop();
+      if(!recordSet.has(mapRecord)) {
+        list.push({buckets: mvb, steps: steps.concat('down'), x, y: y + 1});
+        recordSet.add(mapRecord);
+      }
     }
   }
-
-  step(Number(data.man[0]), Number(data.man[1]));
 
   return results;
 });

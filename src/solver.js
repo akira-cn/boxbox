@@ -16,9 +16,8 @@ export default greenlet((data) => {
   const allBuckets = new Set(data.buckets.map(b => b[1] * BOUND_X + b[0]));
   const spots = data.spots.map(s => s[1] * BOUND_X + s[0]);
 
-  function record(buckets, x, y) {
-    const key = JSON.stringify({x, y, b: Array.from(buckets).sort()});
-    return key;
+  function rec(buckets) {
+    return `${Array.from(buckets).sort()}`;
   }
 
   function isEmpty(buckets, idx) {
@@ -78,68 +77,40 @@ export default greenlet((data) => {
     return MOVE_BOX;
   }
 
-  function moveLeft(buckets, x, y) {
-    if(x < 1) return 0;
-    const next = y * BOUND_X + x - 1;
-    if(isEmpty(buckets, next)) {
-      return MOVE_MAN;
-    }
-    if(buckets.has(next)) {
-      if(x < 2) return 0;
-      const nextnext = next - 1;
-      if(isEmpty(buckets, nextnext)) {
-        return testMove(buckets, nextnext, next);
-      }
-    }
-    return 0;
+  function makeDirectionXY(direction, delta = 1) {
+    const getXYs = [
+      (x, y) => [x - delta, y],
+      (x, y) => [x + delta, y],
+      (x, y) => [x, y - delta],
+      (x, y) => [x, y + delta],
+    ];
+    return getXYs[direction];
   }
 
-  function moveUp(buckets, x, y) {
-    if(y < 1) return 0;
-    const next = (y - 1) * BOUND_X + x;
-    if(isEmpty(buckets, next)) {
-      return MOVE_MAN;
-    }
-    if(buckets.has(next)) {
-      if(y < 2) return 0;
-      const nextnext = next - BOUND_X;
-      if(isEmpty(buckets, nextnext)) {
-        return testMove(buckets, nextnext, next);
-      }
-    }
-    return 0;
+  function getPos(x, y, direction) {
+    if(x < 0 || x >= BOUND_X) return null;
+    if(y < 0 || y >= BOUND_Y) return null;
+    return y * BOUND_X + x;
   }
 
-  function moveRight(buckets, x, y) {
-    if(x >= BOUND_X - 1) return 0;
-    const next = y * BOUND_X + x + 1;
-    if(isEmpty(buckets, next)) {
-      return MOVE_MAN;
-    }
-    if(buckets.has(next)) {
-      if(x >= BOUND_X - 2) return 0;
-      const nextnext = next + 1;
-      if(isEmpty(buckets, nextnext)) {
-        return testMove(buckets, nextnext, next);
+  function makeMove(direction) {
+    const getNextXY = makeDirectionXY(direction);
+    const getNextNextXY = makeDirectionXY(direction, 2);
+    return (buckets, x, y) => {
+      let pos = getNextXY(x, y);
+      const next = getPos(pos[0], pos[1]);
+      if(next && isEmpty(buckets, next)) {
+        return MOVE_MAN;
       }
-    }
-    return 0;
-  }
-
-  function moveDown(buckets, x, y) {
-    if(y >= BOUND_Y - 1) return 0;
-    const next = (y + 1) * BOUND_X + x;
-    if(isEmpty(buckets, next)) {
-      return MOVE_MAN;
-    }
-    if(buckets.has(next)) {
-      if(y >= BOUND_Y - 2) return 0;
-      const nextnext = next + BOUND_X;
-      if(isEmpty(buckets, nextnext)) {
-        return testMove(buckets, nextnext, next);
+      if(next && buckets.has(next)) {
+        pos = getNextNextXY(x, y);
+        const nextnext = getPos(pos[0], pos[1]);
+        if(nextnext && isEmpty(buckets, nextnext)) {
+          return testMove(buckets, nextnext, next);
+        }
       }
-    }
-    return 0;
+      return 0;
+    };
   }
 
   function checkSpots(buckets) {
@@ -148,68 +119,56 @@ export default greenlet((data) => {
     });
   }
 
-  const recordSet = new Set();
+  const LEFT = 0,
+    RIGHT = 1,
+    UP = 2,
+    DOWN = 3;
+
   let results = null;
   const x = Number(data.man[0]),
     y = Number(data.man[1]);
+  const recordSet = new Map();
+
+  recordSet.set(rec(allBuckets), new Set([getPos(x, y)]));
 
   const list = [{buckets: allBuckets, steps: [], x, y}];
 
-  for(let i = 0; i < list.length; i++) {
-    const {buckets, steps, x, y} = list[i];
-    let mvb = new Set(buckets);
-    let check = moveLeft(mvb, x, y);
+  function bfs(buckets, steps, x, y, direction) {
+    const move = makeMove(direction);
+    const getPosByXY = makeDirectionXY(direction);
+
+    const mvb = new Set(buckets);
+    const check = move(mvb, x, y);
     if(check) {
-      const mapRecord = record(mvb, x - 1, y);
+      const pos = getPosByXY(x, y);
+      // const mapRecord = record(mvb, pos[0], pos[1]);
+      const mapRecord = rec(mvb);
       if(check === MOVE_BOX && checkSpots(mvb)) {
-        results = steps.concat('left');
-        break;
+        results = steps.concat(direction);
+        return true;
       }
       if(!recordSet.has(mapRecord)) {
-        list.push({buckets: mvb, steps: steps.concat('left'), x: x - 1, y});
-        recordSet.add(mapRecord);
+        list.push({buckets: mvb, steps: steps.concat(direction), x: pos[0], y: pos[1]});
+        recordSet.set(mapRecord, new Set([getPos(pos[0], pos[1])]));
+      } else {
+        const poss = recordSet.get(mapRecord);
+        const idx = getPos(pos[0], pos[1]);
+        if(!poss.has(idx)) {
+          list.push({buckets: mvb, steps: steps.concat(direction), x: pos[0], y: pos[1]});
+          poss.add(idx);
+        }
       }
     }
-    mvb = new Set(buckets);
-    check = moveRight(mvb, x, y);
-    if(check) {
-      const mapRecord = record(mvb, x + 1, y);
-      if(check === MOVE_BOX && checkSpots(mvb)) {
-        results = steps.concat('right');
-        break;
-      }
-      if(!recordSet.has(mapRecord)) {
-        list.push({buckets: mvb, steps: steps.concat('right'), x: x + 1, y});
-        recordSet.add(mapRecord);
-      }
-    }
-    mvb = new Set(buckets);
-    check = moveUp(mvb, x, y);
-    if(check) {
-      const mapRecord = record(mvb, x, y - 1);
-      if(check === MOVE_BOX && checkSpots(mvb)) {
-        results = steps.concat('up');
-        break;
-      }
-      if(!recordSet.has(mapRecord)) {
-        list.push({buckets: mvb, steps: steps.concat('up'), x, y: y - 1});
-        recordSet.add(mapRecord);
-      }
-    }
-    mvb = new Set(buckets);
-    check = moveDown(mvb, x, y);
-    if(check) {
-      const mapRecord = record(mvb, x, y + 1);
-      if(check === MOVE_BOX && checkSpots(mvb)) {
-        results = steps.concat('down');
-        break;
-      }
-      if(!recordSet.has(mapRecord)) {
-        list.push({buckets: mvb, steps: steps.concat('down'), x, y: y + 1});
-        recordSet.add(mapRecord);
-      }
-    }
+    return false;
   }
 
-  return results;
+  for(let i = 0; i < list.length; i++) {
+    const {buckets, steps, x, y} = list[i];
+    if(bfs(buckets, steps, x, y, LEFT)
+    || bfs(buckets, steps, x, y, RIGHT)
+    || bfs(buckets, steps, x, y, UP)
+    || bfs(buckets, steps, x, y, DOWN)) break;
+  }
+  const m = ['left', 'right', 'up', 'down'];
+  return results.map(r => m[r]);
 });

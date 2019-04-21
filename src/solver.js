@@ -16,10 +16,6 @@ export default greenlet((data) => {
   const allBuckets = new Set(data.buckets.map(b => b[1] * BOUND_X + b[0]));
   const spots = data.spots.map(s => s[1] * BOUND_X + s[0]);
 
-  function rec(buckets) {
-    return `${Array.from(buckets).sort()}`;
-  }
-
   function isEmpty(buckets, idx) {
     return map[idx] === EMPTY && !buckets.has(idx);
   }
@@ -40,8 +36,8 @@ export default greenlet((data) => {
       if(fixed.has(idx)) return false;
       fixed.add(idx);
 
-      const left = isImmovable(idx - 1),
-        right = isImmovable(idx + 1),
+      const left = idx % BOUND_X > 0 && isImmovable(idx - 1),
+        right = idx % BOUND_X < BOUND_X - 1 && isImmovable(idx + 1),
         top = isImmovable(idx - BOUND_X),
         down = isImmovable(idx + BOUND_X);
 
@@ -127,13 +123,101 @@ export default greenlet((data) => {
   let results = null;
   const x = Number(data.man[0]),
     y = Number(data.man[1]);
-  const recordSet = new Map();
 
-  recordSet.set(rec(allBuckets), new Set([getPos(x, y)]));
+  const recordSet = {};
+  function getRecord(b1, b2) {
+    if(recordSet[b1] == null) return null;
+    return recordSet[b1][b2];
+  }
 
-  const list = [{buckets: allBuckets, steps: [], x, y}];
+  function setRecord(b1, b2, pos) {
+    const poss = getRecord(b1, b2) || [0, 0, 0, 0, 0];
+    setPos(poss, pos);
+    recordSet[b1] = recordSet[b1] || {};
+    recordSet[b1][b2] = poss;
+  }
 
-  function bfs(buckets, steps, x, y, direction) {
+  function hasPos(poss, pos) {
+    let idx = 0;
+    while(pos >= 30) {
+      pos -= 30;
+      idx++;
+    }
+    return poss[idx] & (1 << pos);
+  }
+
+  function setPos(poss, pos) {
+    let idx = 0;
+    while(pos >= 30) {
+      pos -= 30;
+      idx++;
+    }
+    poss[idx] |= (1 << pos);
+  }
+
+  function pack({buckets, x, y, step, pre}) {
+    const arr = new Uint32Array(4);
+    buckets = Array.from(buckets).sort();
+    for(let i = 0; i < 8; i++) {
+      let bucket = buckets[i];
+      if(bucket == null) bucket = 0xff;
+      if(i < 4) {
+        arr[0] |= bucket << (8 * i);
+      } else {
+        arr[1] |= bucket << (8 * (i - 4));
+      }
+    }
+    arr[2] |= x;
+    arr[2] |= y << 8;
+    if(pre !== 0xffffffff) {
+      arr[2] |= step << 16;
+    }
+    arr[3] = pre;
+    return arr;
+  }
+
+  function unpack(a, b, c, d) {
+    let buckets = [
+      a & 0xff,
+      (a >>> 8) & 0xff,
+      (a >>> 16) & 0xff,
+      (a >>> 24) & 0xff,
+      b & 0xff,
+      (b >>> 8) & 0xff,
+      (b >>> 16) & 0xff,
+      (b >>> 24) & 0xff,
+    ];
+    buckets = new Set(buckets.filter(b => b !== 0xff));
+    const x = c & 0xff;
+    const y = (c >> 8) & 0xff;
+    let step = -1;
+    if(d !== 0xffffffff) {
+      step = (c >> 16) & 0xff;
+    }
+    return {buckets, x, y, step, pre: d};
+  }
+
+  // 以两位Uint32来表示所有的8个buckets，以一位Uint32来表示x,y,direction，以一位Uint32来表示preIndex
+  const list = new Uint32Array(256 * 1024 * 1024);
+  const packed = pack({buckets: allBuckets, pre: -1, x, y});
+  list[0] = packed[0];
+  list[1] = packed[1];
+  list[2] = packed[2];
+  list[3] = packed[3];
+
+  setRecord(list[0], list[1], getPos(x, y));
+
+  function getSteps(idx) {
+    const data = unpack(list[idx], list[idx + 1], list[idx + 2], list[idx + 3]);
+    if(data.step >= 0) {
+      return getSteps(data.pre).concat(data.step);
+    }
+    return [];
+  }
+
+  let count = 4;
+
+  function bfs(buckets, i, x, y, direction) {
     const move = makeMove(direction);
     const getPosByXY = makeDirectionXY(direction);
 
@@ -141,34 +225,45 @@ export default greenlet((data) => {
     const check = move(mvb, x, y);
     if(check) {
       const pos = getPosByXY(x, y);
-      // const mapRecord = record(mvb, pos[0], pos[1]);
-      const mapRecord = rec(mvb);
       if(check === MOVE_BOX && checkSpots(mvb)) {
-        results = steps.concat(direction);
+        results = getSteps(i).concat(direction);
         return true;
       }
-      if(!recordSet.has(mapRecord)) {
-        list.push({buckets: mvb, steps: steps.concat(direction), x: pos[0], y: pos[1]});
-        recordSet.set(mapRecord, new Set([getPos(pos[0], pos[1])]));
+      const packed = pack({buckets: mvb, pre: i, step: direction, x: pos[0], y: pos[1]});
+      const poss = getRecord(packed[0], packed[1]);
+      if(!poss) {
+        list[count] = packed[0];
+        list[count + 1] = packed[1];
+        list[count + 2] = packed[2];
+        list[count + 3] = packed[3];
+        count += 4;
+        setRecord(packed[0], packed[1], getPos(pos[0], pos[1]));
       } else {
-        const poss = recordSet.get(mapRecord);
         const idx = getPos(pos[0], pos[1]);
-        if(!poss.has(idx)) {
-          list.push({buckets: mvb, steps: steps.concat(direction), x: pos[0], y: pos[1]});
-          poss.add(idx);
+        if(!hasPos(poss, idx)) {
+          list[count] = packed[0];
+          list[count + 1] = packed[1];
+          list[count + 2] = packed[2];
+          list[count + 3] = packed[3];
+          count += 4;
+          setPos(poss, idx);
         }
       }
     }
     return false;
   }
 
-  for(let i = 0; i < list.length; i++) {
-    const {buckets, steps, x, y} = list[i];
-    if(bfs(buckets, steps, x, y, LEFT)
-    || bfs(buckets, steps, x, y, RIGHT)
-    || bfs(buckets, steps, x, y, UP)
-    || bfs(buckets, steps, x, y, DOWN)) break;
+  for(let i = 0; i < list.length; i += 4) {
+    if(list[i] === 0) {
+      break;
+    }
+    const {buckets, x, y} = unpack(list[i], list[i + 1], list[i + 2], list[i + 3]);
+    if(bfs(buckets, i, x, y, LEFT)
+      || bfs(buckets, i, x, y, RIGHT)
+      || bfs(buckets, i, x, y, UP)
+      || bfs(buckets, i, x, y, DOWN)) break;
   }
+
   const m = ['left', 'right', 'up', 'down'];
   return results.map(r => m[r]);
 });
